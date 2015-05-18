@@ -16,6 +16,7 @@
 package net.skora.eccardinfos;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 
 import android.app.Activity;
@@ -145,7 +146,7 @@ public class ECCardInfosActivity extends Activity {
 				readKreditkarte();
 				
 				// Now following: AIDs I never tried until now - perhaps they work, possibly not
-			} else if (new String(transceive("00 A4 04 0C 07 A0 00 00 00 03 10 10"), "ISO-8859-1").length() > 2) {
+			} else if (new String(transceive("00 A4 04 0C 07 A0 00 00 00 03 10 10"), "ISO-8859-1").contains("VISA")) { //Actually contains the name of the bank additionally, for me
 				cardtype.setText("Visa");
 				readKreditkarte();
 			} else if (new String(transceive("00 A4 04 0C 07 A0 00 00 00 04 99 99"), "ISO-8859-1").length() > 2) {
@@ -219,17 +220,86 @@ public class ECCardInfosActivity extends Activity {
 	private void readKreditkarte() {
 		try {
 			byte[] recv = transceive("00 B2 01 0C 00");
-			kknr.setText(new String(Arrays.copyOfRange(recv, 29, 45), "ISO-8859-1"));
-			verfall.setText(
-					new String(Arrays.copyOfRange(recv, 75, 77), "ISO-8859-1")
-					.concat("/")
-					.concat(new String(Arrays.copyOfRange(recv, 73, 75), "ISO-8859-1"))
-					);
+			String bytes=bytesToHex(recv);
+			if(bytes.startsWith("70")) //112 in decimal
+			{
+				//Read length
+				int length=recv[1] & 0xFF;
+				recv=Arrays.copyOfRange(recv, 2, length+2);
+				while(recv.length!=0)
+				{
+					switch(recv[0] & 0xFF)
+					{
+						case 87: //Contains the copy of the magnetic track 2, is 57 in hex
+							recv=readTrack2(recv);
+							break;
+						case 95: //5F, this is a 4 digit hex code
+							switch(recv[1] & 0xFF)
+							{
+								case 32: //Cardholder name, 20 in hex
+									recv=readCardholderName(recv);
+									break;
+								default:
+									System.out.println("UNKNOWN TAG: 5F"+(recv[1]&0xFF));
+									recv=Arrays.copyOfRange(recv, 2, recv.length);
+									break;
+							}
+							break;
+						default:
+							System.out.println("Unknown TAG: "+(recv[0]&0xFF));
+							recv=Arrays.copyOfRange(recv, 1, recv.length);
+							break;
+					}
+				}
+			}
+//			System.out.println("Bytes ARE: "+bytes);
 		} catch (IOException e) {
 			toastError(getResources().getText(R.string.error_nfc_comm_cont) + (e.getMessage() != null ? e.getMessage() : "-"));
 		}
 	}
 	
+	private byte[] readCardholderName(byte[] recv) throws UnsupportedEncodingException {
+		if(((recv[0] & 0xFF) !=95) || ((recv[1] & 0xFF) !=32)) //Hex 5F20
+		{
+			return recv;
+		}
+		int length=recv[2] & 0xFF;
+		byte[] nameBytes=Arrays.copyOfRange(recv, 3, length+3);
+		byte[] returnArray=Arrays.copyOfRange(recv,3+length,recv.length);
+		String name=new String(nameBytes,"ISO-8859-1");
+		System.out.println("Name is: "+name);
+		return returnArray;
+	}
+
+	private byte[] readTrack2(byte[] recv) {
+		final int expirationDateLength=4;
+		final int serviceCodeLength=3;
+		final char fieldSeparator='D';
+		final char padByte='F';
+		if((recv[0] & 0xFF )!=87) //Hex 57
+		{
+			return recv;
+		}
+		int length=recv[1] & 0xFF;
+		byte[] track2=Arrays.copyOfRange(recv, 2, length+2);
+		byte[] returnArray=Arrays.copyOfRange(recv,2+length,recv.length);
+		String hex=bytesToHex(track2);
+		int endAccountNumber=hex.indexOf(fieldSeparator); //field separator
+		kknr.setText(hex.substring(0, endAccountNumber));
+		String validDates=hex.substring(endAccountNumber+1,endAccountNumber+1+expirationDateLength);
+		verfall.setText(validDates.substring(2, 4)+"/"+validDates.substring(0, 2));
+		String serviceCode=hex.substring(endAccountNumber+1+expirationDateLength,endAccountNumber+1+expirationDateLength+serviceCodeLength);
+		int endTrack2=hex.indexOf(padByte); //optional!
+		if(endTrack2==-1)
+		{
+			endTrack2=hex.length()-1;
+		}
+		String discretionaryData=hex.substring(endAccountNumber+1+expirationDateLength+serviceCodeLength,endTrack2);
+				
+		return returnArray;
+		
+	}
+
 	protected byte[] transceive(String hexstr) throws IOException {
 		String[] hexbytes = hexstr.split("\\s");
 		byte[] bytes = new byte[hexbytes.length];
@@ -273,8 +343,8 @@ public class ECCardInfosActivity extends Activity {
 			Intent intent = new Intent(ECCardInfosActivity.this, TransactionsActivity.class);
 			try  {
 				// Read all EF_BLOG records
-				for (int i = 1; i <= 15; i++) {
-					byte[] recv = transceive(String.format("00 B2 %02x EC 00", i));
+				for (int i = 1; i <= 15; i++) { //Bis 3 für LLOG
+					byte[] recv = transceive(String.format("00 B2 %02x EC 00", i)); //ist E4 für LLOG
 					intent.putExtra(String.format("blog_%d", i), recv);
 				}
 				startActivity(intent);
@@ -311,5 +381,16 @@ public class ECCardInfosActivity extends Activity {
 	
 	protected void toastError(CharSequence msg) {
 		Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+	}
+	
+	final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+	public static String bytesToHex(byte[] bytes) {
+	    char[] hexChars = new char[bytes.length * 2];
+	    for ( int j = 0; j < bytes.length; j++ ) {
+	        int v = bytes[j] & 0xFF;
+	        hexChars[j * 2] = hexArray[v >>> 4];
+	        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+	    }
+	    return new String(hexChars);
 	}
 }

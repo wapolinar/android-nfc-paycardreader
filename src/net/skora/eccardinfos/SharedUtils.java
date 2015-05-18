@@ -20,7 +20,7 @@ public class SharedUtils {
 		String cents = Integer.toHexString(amount[2] >= 0 ? amount[2] : 256 + amount[2]);
 		if (cents.length() == 1) res.append("0");
 		res.append(cents);
-		res.append("â‚¬");
+		res.append("€");
 		return res.toString();
     }
     
@@ -29,7 +29,7 @@ public class SharedUtils {
 		case 0: return new String("Laden");
 		case 1: return new String("Entladen");
 		case 2: return new String("Abbuchen");
-		case 3: return new String("RÃ¼ckbuchen");
+		case 3: return new String("Rückbuchen");
 		}
 		return new String("");
     }

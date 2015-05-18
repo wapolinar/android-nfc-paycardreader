@@ -25,7 +25,7 @@ public class TransactionsActivity extends ListActivity {
 			Integer len = recv.length;
 			if (len > 33 && recv[len - 2] == (byte) 0x90 && recv[len - 1] == 0) {
 				String action = SharedUtils.parseLogState(recv[0]);
-				String amount = SharedUtils.formatBCDAmount(Arrays.copyOfRange(recv, 17, 20));
+				String amount = SharedUtils.formatBCDAmount(Arrays.copyOfRange(recv, 17, 20)); //Ist: 4, 7 für LLog
 				String hknr = SharedUtils.Byte2Hex(Arrays.copyOfRange(recv, 3, 13), "");
 				if (hknr.equals("00000000000000000000")) continue;
 				String date = String.format("%02x.%02x.%02x%02x", recv[31], recv[30], recv[28], recv[29]);
