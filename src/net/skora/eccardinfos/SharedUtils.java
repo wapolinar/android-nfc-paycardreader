@@ -1,6 +1,9 @@
 package net.skora.eccardinfos;
 
 public class SharedUtils {
+	
+	final private static char[] hexArray = "0123456789ABCDEF".toCharArray();
+	
     static protected String formatBCDAmount(byte[] amount) {
 		StringBuilder res = new StringBuilder(); 
 		if (amount[0] != 0) res.append(Integer.toHexString(amount[0] >= 0 ? amount[0] : 256 + amount[0]));
@@ -45,5 +48,15 @@ public class SharedUtils {
 			result.append(String.format("%02X" + space, inputbyte));
 		}
 		return result.toString();
+	}
+
+	protected static String bytesToHex(byte[] bytes) {
+	    char[] hexChars = new char[bytes.length * 2];
+	    for ( int j = 0; j < bytes.length; j++ ) {
+	        int v = bytes[j] & 0xFF;
+	        hexChars[j * 2] = SharedUtils.hexArray[v >>> 4];
+	        hexChars[j * 2 + 1] = SharedUtils.hexArray[v & 0x0F];
+	    }
+	    return new String(hexChars);
 	}
 }

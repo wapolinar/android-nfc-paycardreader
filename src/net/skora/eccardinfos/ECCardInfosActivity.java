@@ -220,7 +220,7 @@ public class ECCardInfosActivity extends Activity {
 	private void readKreditkarte() {
 		try {
 			byte[] recv = transceive("00 B2 01 0C 00");
-			String bytes=bytesToHex(recv);
+			String bytes=SharedUtils.bytesToHex(recv);
 			if(bytes.startsWith("70")) //112 in decimal
 			{
 				//Read length
@@ -283,7 +283,7 @@ public class ECCardInfosActivity extends Activity {
 		int length=recv[1] & 0xFF;
 		byte[] track2=Arrays.copyOfRange(recv, 2, length+2);
 		byte[] returnArray=Arrays.copyOfRange(recv,2+length,recv.length);
-		String hex=bytesToHex(track2);
+		String hex=SharedUtils.bytesToHex(track2);
 		int endAccountNumber=hex.indexOf(fieldSeparator); //field separator
 		kknr.setText(hex.substring(0, endAccountNumber));
 		String validDates=hex.substring(endAccountNumber+1,endAccountNumber+1+expirationDateLength);
@@ -381,16 +381,5 @@ public class ECCardInfosActivity extends Activity {
 	
 	protected void toastError(CharSequence msg) {
 		Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
-	}
-	
-	final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
-	public static String bytesToHex(byte[] bytes) {
-	    char[] hexChars = new char[bytes.length * 2];
-	    for ( int j = 0; j < bytes.length; j++ ) {
-	        int v = bytes[j] & 0xFF;
-	        hexChars[j * 2] = hexArray[v >>> 4];
-	        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
-	    }
-	    return new String(hexChars);
 	}
 }
